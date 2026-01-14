@@ -7,3 +7,5 @@ crash.log
 # Secrets / env
 .env
 .env.*
+# Terraform build artifacts
+infra/terraform/build/
