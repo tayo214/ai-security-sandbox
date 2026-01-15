@@ -56,6 +56,7 @@ resource "aws_lambda_function" "ai_gateway" {
   environment {
     variables = {
       MAX_INPUT_CHARS = "4000"
+      OPENAI_SECRET_ARN = var.openai_secret_arn
     }
   }
 }
@@ -104,4 +105,27 @@ resource "aws_lambda_permission" "apigw_invoke" {
   function_name = aws_lambda_function.ai_gateway.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
+}
+resource "aws_iam_policy" "lambda_openai_secret_read" {
+  name = "${local.name_prefix}-lambda-openai-secret-read"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadOpenAISecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = var.openai_secret_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_openai_secret_read_attach" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = aws_iam_policy.lambda_openai_secret_read.arn
 }
