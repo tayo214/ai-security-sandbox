@@ -55,7 +55,7 @@ resource "aws_lambda_function" "ai_gateway" {
 
   environment {
     variables = {
-      MAX_INPUT_CHARS = "4000"
+      MAX_INPUT_CHARS   = "4000"
       OPENAI_SECRET_ARN = var.openai_secret_arn
     }
   }
@@ -128,4 +128,55 @@ resource "aws_iam_policy" "lambda_openai_secret_read" {
 resource "aws_iam_role_policy_attachment" "lambda_openai_secret_read_attach" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = aws_iam_policy.lambda_openai_secret_read.arn
+}
+resource "aws_cloudwatch_log_metric_filter" "ai_allowed_requests" {
+  name           = "${local.name_prefix}-allowed-requests"
+  log_group_name = "/aws/lambda/${local.name_prefix}-ai-gateway"
+
+  pattern = "{ $.event_type = \"allowed_input\" }"
+
+  metric_transformation {
+    name      = "ai_allowed_requests"
+    namespace = "AI/Security"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "ai_blocked_requests" {
+  name           = "${local.name_prefix}-blocked-requests"
+  log_group_name = "/aws/lambda/${local.name_prefix}-ai-gateway"
+
+  pattern = "{ $.event_type = \"blocked_input\" }"
+
+  metric_transformation {
+    name      = "ai_blocked_requests"
+    namespace = "AI/Security"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "ai_blocked_requests_alarm" {
+  alarm_name          = "${local.name_prefix}-ai-blocked-requests"
+  alarm_description   = "Detects prompt injection or policy violations against AI gateway"
+  namespace           = "AI/Security"
+  metric_name         = "ai_blocked_requests"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+}
+
+resource "aws_cloudwatch_metric_alarm" "ai_allowed_requests_spike" {
+  alarm_name          = "${local.name_prefix}-ai-allowed-requests-spike"
+  alarm_description   = "Detects abnormal spikes in AI usage"
+  namespace           = "AI/Security"
+  metric_name         = "ai_allowed_requests"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 20
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
 }
